@@ -125,33 +125,79 @@ end
 #     - Treat the before version [0] the same as the after version.
 #     - Indicate if the value was changed immediatly. (#1 above)
 
-# Debug code, remove later
-# puts "beforeHash:"
-# printHash(beforeHash)
-
-# puts "\n\nafterHash:"
-# printHash(afterHash)
-#
-#
-
 # OK, Going to do #3 then #4, removing those entries makes it easie to handle #1 and #2 afterward.
 
 # 3 - The before has a key that was converted to an array.
 #     I know, there has to be a more elegant way to do this, for now brute force!!
-
-# This line gives us a new "after" has where all the keys have the [ as
-# part of their name. // BTW, this is a big assumption!!
 puts "\n"
-puts "Looking for keys that were converted to an array:"
+puts "Looking for keys that were converted from a single key to an array:"
+# Create a new hash where only the keys have an array element.
 afterHashArr = afterHash.select { |key, value| key.to_s.match(/\[/) }
 afterHashArr.each_pair do |key, value|
     nonArrayKey, rest = key.split('[');
     if (beforeHash.has_key?(nonArrayKey)) then
-        puts "  Key #{nonArrayKey} was converted to an array #{key}."
+        puts "  #{nonArrayKey} converted to #{key}."
         value == beforeHash[nonArrayKey] or puts  "  ***Warning: #{nonArrayKey} => #{beforeHash[nonArrayKey]} does not match #{key} => #{value}"
         beforeHash.delete(nonArrayKey);
         afterHashArr.delete(key);
     end 
+end
+
+
+# 4 - Any arrays converted to back?
+puts "\n"
+puts "Looking for keys that were converted from an array to a single key:"
+beforeHashArr = beforeHash.select { |key, value| key.to_s.match(/\[/) }
+beforeHashArr.each_pair do |key, value|
+    nonArrayKey, rest = key.split('[');
+    if (afterHash.has_key?(nonArrayKey)) then
+        puts "  #{key} converted to #{nonArrayKey}."
+        value == afterHash[nonArrayKey] or puts  "  ***Warning: #{nonArrayKey} => #{afterHash[nonArrayKey]} does not match #{key} => #{value}"
+        afterHash.delete(nonArrayKey);
+        beforeHashArr.delete(key);
+    end 
+end
+
+
+# YAY!! Array conversions are taken care of. The values in the hashes are all either #1 or #2.
+# #1...
+puts "\n"
+puts "Looking for values of existing keys that changed:"
+beforeHash.each_pair do |key, value|
+    if (afterHash.has_key?(key)) then
+        value == afterHash[key] or puts  "  #{key} changed from #{value} to #{afterHash[key]}"
+        afterHash.delete(key);
+        beforeHash.delete(key);
+    end 
+end
+
+# All that is left are values that were removed or added.
+#
+puts "\n"
+puts "Keys in #{$before} that were removed:"
+beforeHash.each_pair do |key, value|
+    puts  "  #{key} => #{value}"
+    beforeHash.delete(key)
+end
+
+puts "\n"
+puts "Keys in #{$after} that were added:"
+afterHash.each_pair do |key, value|
+    puts  "  #{key} => #{value}"
+    afterHash.delete(key)
+end
+
+# Sanity check. Better not have anything left over!!!
+if (beforeHash.size > 0) then
+    puts "\n"
+    puts "Unaccounted entries from #{$before}:"
+    printHash beforeHash
+end
+
+if (afterHash.size > 0) then
+    puts "\n"
+    puts "Unaccounted entries from #{$after}:"
+    printHash beforeHash
 end
 
 
