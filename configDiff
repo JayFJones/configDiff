@@ -1,0 +1,157 @@
+#!/usr/bin/env ruby
+
+def usage(s)
+    $stderr.puts(s)
+    $stderr.puts("Usage: #{File.basename($0)}: <gw_config_before> <gw_config_after>")
+    exit(2)
+end
+
+def printHash(h)
+    h.each_pair do |k, v|
+        puts k + ": " + v;
+    end
+end
+
+if (ARGV[0] == nil) then
+    usage("Unknown option: #{ARGV[0].inspect}")
+end;
+
+if (ARGV[1] == nil) then
+    usage("Unknown option: #{ARGV[1].inspect}")
+end;
+
+$before  = ARGV[0];
+$after   = ARGV[1];
+
+# Program carries on here.
+# puts("quiet: #{$quiet} before: #{$before.inspect} after: #{$after.inspect} args: #{ARGV.inspect}")
+#
+
+# Let's make sure the user provided valid files.
+FileTest.file?($before) or abort("Not a valid file: #{$before}")
+FileTest.file?($after) or abort("Not a valid file: #{$after}")
+FileTest.readable?($before) or abort("Could not read file: #{$before}")
+FileTest.readable?($after) or abort("Could not read file:: #{$after}")
+
+
+# The following two lines read each file into an array. Just a note 
+# of caution, readlines retains whatever new-line carraige returns
+# from the file.
+beforeArr = IO.readlines($before)
+afterArr = IO.readlines($after)
+
+# I found that we need to do some extra sanity before going forward.
+# For instance, I saw in one log where there was a "non-array" value
+# and there was also a corresponding "array" value that would
+# have represented it.  Not sure if that is supposed to be allowed!
+# So for now, walk each of the files, if you find within the SAME
+# file a non-array and array equivalent, log it, remove the non-array
+# equivalent and move on. I will ask later if this is a reasonable approach
+# but the data really need to be normalized before getting into the differences.
+sanityBeforeHash = Hash.new
+beforeArr.each { |str| k,v = str.tr("\n","").split("="); sanityBeforeHash[k] = (v != nil) ? v : "<NO-VALUE>" ; } 
+sanityAfterHash = Hash.new
+afterArr.each { |str| k,v = str.tr("\n","").split("="); sanityAfterHash[k] = (v != nil) ? v : "<NO-VALUE>" ; } 
+
+removeBeforeKey = Array.new
+removeAfterKey = Array.new
+
+sbHashArr = sanityBeforeHash.select { |key, value| key.to_s.match(/\[/) }
+sbHashArr.each_pair do |key, value|
+    nonArrayKey, rest = key.split('[');
+    if sanityBeforeHash.has_key?(nonArrayKey) then
+        puts "***Warning, #{$before}: #{nonArrayKey} exists alongside #{key}."
+        value == sanityBeforeHash[nonArrayKey] or puts  "   and #{nonArrayKey} => #{sanityBeforeHash[nonArrayKey]} does not match #{key} => #{value}"
+        removeBeforeKey.push(nonArrayKey);
+    end
+end
+
+saHashArr = sanityAfterHash.select { |key, value| key.to_s.match(/\[/) }
+saHashArr.each_pair do |key, value|
+    nonArrayKey, rest = key.split('[');
+    if sanityAfterHash.has_key?(nonArrayKey) then
+        puts "***Warning, #{$after}: #{nonArrayKey} exists alongside #{key}."
+        value == sanityAfterHash[nonArrayKey] or puts  "   and #{nonArrayKey} => #{sanityAfterHash[nonArrayKey]} does not match #{key} => #{value}"
+        removeAfterKey.push(nonArrayKey);
+    end
+end
+
+# OK, hopefully all the shenanigans are over with....
+
+# Back to our regularily scheduled show.
+#
+# Now, we really do not care about the entries that are the same between the
+# two arrays. So let's make our job easier and "clean" up the arrays.
+# The "subtraction" operator against an array returns a new array
+# with the unique values from the first array in-tact.
+cBeforeArr = beforeArr - afterArr
+cAfterArr  = afterArr - beforeArr
+
+# By definition a hash stores a key and an associated value. The key must be unique.
+beforeHash = Hash.new
+cBeforeArr.each { |str| k,v = str.tr("\n","").split("="); beforeHash[k] = (v != nil) ? v : "<NO-VALUE>" ; } 
+afterHash = Hash.new
+cAfterArr.each { |str| k,v = str.tr("\n","").split("="); afterHash[k] = (v != nil) ? v : "<NO-VALUE>" ; } 
+
+# So, sanity check here. Since the hash may only have unuqie keys. 
+# The size of the array and the size of the hash had better have the same value
+# or at some point and time the same key was repeated!!
+# For now just inform the user. Late we can go get the duplicate keys:
+# http://stackoverflow.com/questions/4351390/how-do-i-check-an-array-for-duplicates
+if (cBeforeArr.size() != beforeHash.size()) then
+    puts "Note:   The file #{$before} contains entries with the same key."
+end;
+if (cAfterArr.size() != afterHash.size()) then
+    puts "Note:   The file #{$after} contains entries with the same key."
+end;
+
+# Any of the entries that are "not legal" from above should now be removed.
+removeBeforeKey.each do |key|
+    beforeHash.delete(key);
+end
+removeAfterKey.each do |key|
+    afterHash.delete(key);
+end
+
+# OK, now we have two hashes with the configurations that do not
+# match.  Why do they not match?
+# 1)  The key exists but the value changed. See array conversion below, this applies there also.
+# 2)  The key exists in one but not the other.
+#     - Show this as "key removed" for in before, but not in after. Or,
+#     - Show this as key added "for in after, but not in before.
+# 3)  The key was converted to an array of the same key.
+#     - Treat the after [0] version as the same as the before version. (#1 above)
+# 4) The key was converted to a single value from an array. 
+#     - Treat the before version [0] the same as the after version.
+#     - Indicate if the value was changed immediatly. (#1 above)
+
+# Debug code, remove later
+# puts "beforeHash:"
+# printHash(beforeHash)
+
+# puts "\n\nafterHash:"
+# printHash(afterHash)
+#
+#
+
+# OK, Going to do #3 then #4, removing those entries makes it easie to handle #1 and #2 afterward.
+
+# 3 - The before has a key that was converted to an array.
+#     I know, there has to be a more elegant way to do this, for now brute force!!
+
+# This line gives us a new "after" has where all the keys have the [ as
+# part of their name. // BTW, this is a big assumption!!
+puts "\n"
+puts "Looking for keys that were converted to an array:"
+afterHashArr = afterHash.select { |key, value| key.to_s.match(/\[/) }
+afterHashArr.each_pair do |key, value|
+    nonArrayKey, rest = key.split('[');
+    if (beforeHash.has_key?(nonArrayKey)) then
+        puts "  Key #{nonArrayKey} was converted to an array #{key}."
+        value == beforeHash[nonArrayKey] or puts  "  ***Warning: #{nonArrayKey} => #{beforeHash[nonArrayKey]} does not match #{key} => #{value}"
+        beforeHash.delete(nonArrayKey);
+        afterHashArr.delete(key);
+    end 
+end
+
+

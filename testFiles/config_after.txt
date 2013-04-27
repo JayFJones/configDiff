@@ -1,0 +1,13 @@
+key_1=value_1
+key_2=
+key_3=value_3
+key_4[0]=value_4
+key_5=
+key_6=value_6
+key_7[0]=value_7
+key_7[1]=value_7
+key_7[2]=value_7
+key_8[2]=not_same
+key_8[3]=value_8
+key_8[4]=value_8
+key_6[3]=not_same
