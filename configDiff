@@ -1,5 +1,9 @@
 #!/usr/bin/env ruby
 
+# I leanred that the best way to handlethe CTRL-M issue, is that when you see it just .delete("\C-M"). 
+# Still ii feels like a horrible hack. It could be that the text was in one of the input files? Regardless
+# by removoing the character before printing, the output is always clean.
+
 def usage(s)
     $stderr.puts(s)
     $stderr.puts("Usage: #{File.basename($0)}: <gw_config_before> <gw_config_after>")
@@ -61,7 +65,7 @@ sbHashArr.each_pair do |key, value|
     nonArrayKey, rest = key.split('[');
     if sanityBeforeHash.has_key?(nonArrayKey) then
         puts "***Warning, #{$before}: #{nonArrayKey} exists alongside #{key}."
-        value == sanityBeforeHash[nonArrayKey] or puts  "   and #{nonArrayKey} => #{sanityBeforeHash[nonArrayKey]} does not match #{key} => #{value}"
+        value == sanityBeforeHash[nonArrayKey] or puts  "   and #{nonArrayKey} => #{sanityBeforeHash[nonArrayKey]} does not match #{key} => #{value}".delete("\C-M")
         removeBeforeKey.push(nonArrayKey);
     end
 end
@@ -71,7 +75,7 @@ saHashArr.each_pair do |key, value|
     nonArrayKey, rest = key.split('[');
     if sanityAfterHash.has_key?(nonArrayKey) then
         puts "***Warning, #{$after}: #{nonArrayKey} exists alongside #{key}."
-        value == sanityAfterHash[nonArrayKey] or puts  "   and #{nonArrayKey} => #{sanityAfterHash[nonArrayKey]} does not match #{key} => #{value}"
+        value == sanityAfterHash[nonArrayKey] or puts  "   and #{nonArrayKey} => #{sanityAfterHash[nonArrayKey]} does not match #{key} => #{value}".delete("\C-M")
         removeAfterKey.push(nonArrayKey);
     end
 end
@@ -137,7 +141,7 @@ afterHashArr.each_pair do |key, value|
     nonArrayKey, rest = key.split('[');
     if (beforeHash.has_key?(nonArrayKey)) then
         puts "  #{nonArrayKey} converted to #{key}."
-        value == beforeHash[nonArrayKey] or puts  "  ***Warning: #{nonArrayKey} => #{beforeHash[nonArrayKey]} does not match #{key} => #{value}"
+        value == beforeHash[nonArrayKey] or puts  "  ***Warning: #{nonArrayKey} => #{beforeHash[nonArrayKey]} does not match #{key} => #{value}".delete("\C-M")
         beforeHash.delete(nonArrayKey);
         afterHashArr.delete(key);
     end 
@@ -152,7 +156,7 @@ beforeHashArr.each_pair do |key, value|
     nonArrayKey, rest = key.split('[');
     if (afterHash.has_key?(nonArrayKey)) then
         puts "  #{key} converted to #{nonArrayKey}."
-        value == afterHash[nonArrayKey] or puts  "  ***Warning: #{nonArrayKey} => #{afterHash[nonArrayKey]} does not match #{key} => #{value}"
+        value == afterHash[nonArrayKey] or puts  "  ***Warning: #{nonArrayKey} => #{afterHash[nonArrayKey]} does not match #{key} => #{value}".delete!("\C-M")
         afterHash.delete(nonArrayKey);
         beforeHashArr.delete(key);
     end 
@@ -165,7 +169,7 @@ puts "\n"
 puts "Looking for values of existing keys that changed:"
 beforeHash.each_pair do |key, value|
     if (afterHash.has_key?(key)) then
-        value == afterHash[key] or puts  "  #{key} changed from #{value} to #{afterHash[key]}"
+        value == afterHash[key] or puts  "  #{key} changed from #{value} to #{afterHash[key]}".delete!("\C-M")
         afterHash.delete(key);
         beforeHash.delete(key);
     end 
@@ -176,15 +180,14 @@ end
 puts "\n"
 puts "Keys in #{$before} that were removed:"
 beforeHash.each_pair do |key, value|
-    puts  "  #{key} => #{value}"
+    puts  "  #{key} => #{value}".delete!("\C-M")
     beforeHash.delete(key)
 end
 
 puts "\n"
 puts "Keys in #{$after} that were added:"
 afterHash.each_pair do |key, value|
-    puts  "  #{key} => #{value}"
-    afterHash.delete(key)
+    puts  "  #{key} => #{value}".delete("\C-M")
 end
 
 # Sanity check. Better not have anything left over!!!
@@ -194,10 +197,5 @@ if (beforeHash.size > 0) then
     printHash beforeHash
 end
 
-if (afterHash.size > 0) then
-    puts "\n"
-    puts "Unaccounted entries from #{$after}:"
-    printHash beforeHash
-end
-
-
+# We do not care about the after hash, since whatever is left over 
+# is considered "desired".
